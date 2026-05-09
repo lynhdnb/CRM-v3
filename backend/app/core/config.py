@@ -3,6 +3,7 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    CORS_ORIGINS: list = ["*"]
     # App settings
     APP_NAME: str = "CRM System"
     APP_VERSION: str = "0.1.0"

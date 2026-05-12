@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.modules.auth.api import router as auth_router
 from app.modules.users.api import router as users_router
 from app.modules.courses.api import router as courses_router
+from app.modules.organizations.api import router as organizations_router
 
 
 @asynccontextmanager
@@ -43,6 +44,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(users_router, prefix="/api/v1")
 app.include_router(courses_router, prefix="/api/v1")
+app.include_router(organizations_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

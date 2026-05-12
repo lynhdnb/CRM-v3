@@ -5,6 +5,7 @@ from sqlalchemy.sql import func
 from uuid import uuid4
 
 from app.core.models import Base
+from app.modules.organizations.models import user_organization
 
 
 class User(Base):
@@ -18,8 +19,13 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
-    # Обратная связь с курсами (один ко многим)
+    # Отношения
     courses = relationship("Course", back_populates="organizer", cascade="all, delete-orphan")
+    organizations = relationship(
+        "Organization",
+        secondary=user_organization,
+        back_populates="users"
+    )
 
     def __repr__(self) -> str:
         return f"<User(id='{self.id}', email='{self.email}', is_active={self.is_active})>"

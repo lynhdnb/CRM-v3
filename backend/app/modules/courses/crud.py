@@ -1,7 +1,8 @@
 """CRUD operations for Course model"""
-from typing import Sequence
+from typing import Sequence, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from .models import Course
 from .schemas import CourseCreate, CourseUpdate
@@ -9,13 +10,16 @@ from .schemas import CourseCreate, CourseUpdate
 
 async def create_course(
     session: AsyncSession,
-    course_create: CourseCreate,
+    course_data: CourseCreate,
     organizer_id: str
 ) -> Course:
-    """Create a new course for a specific user"""
+    """Create a new course"""
     db_course = Course(
+        title=course_data.title,
+        description=course_data.description,
+        organization_id=course_data.organization_id,
         organizer_id=organizer_id,
-        **course_create.model_dump()
+        price=0  # Default price if not provided
     )
     session.add(db_course)
     await session.commit()
@@ -23,38 +27,30 @@ async def create_course(
     return db_course
 
 
-async def get_course_by_id(
-    session: AsyncSession,
-    course_id: str,
-    organizer_id: str
-) -> Course | None:
-    """Get a course by ID, checking ownership and active status"""
+async def get_course_by_id(session: AsyncSession, course_id: str) -> Optional[Course]:
+    """Get course by ID"""
     result = await session.execute(
-        select(Course).where(
-            Course.id == course_id,
-            Course.organizer_id == organizer_id,
-            Course.is_active == True  # noqa: E712
-        )
+        select(Course)
+        .where(Course.id == course_id)
+        .options(selectinload(Course.organization))
     )
     return result.scalar_one_or_none()
 
 
-async def get_courses_by_organizer(
+async def get_courses(
     session: AsyncSession,
-    organizer_id: str,
+    organization_id: Optional[str] = None,
     skip: int = 0,
     limit: int = 10
 ) -> Sequence[Course]:
-    """Get list of ACTIVE courses for a specific organizer"""
-    result = await session.execute(
-        select(Course)
-        .where(
-            Course.organizer_id == organizer_id,
-            Course.is_active == True  # noqa: E712
-        )
-        .offset(skip)
-        .limit(limit)
-    )
+    """Get list of courses with optional organization filter"""
+    stmt = select(Course)
+    
+    if organization_id:
+        stmt = stmt.where(Course.organization_id == organization_id)
+    
+    stmt = stmt.offset(skip).limit(limit)
+    result = await session.execute(stmt)
     return result.scalars().all()
 
 
@@ -74,12 +70,8 @@ async def update_course(
     return db_course
 
 
-async def delete_course(
-    session: AsyncSession,
-    db_course: Course
-) -> bool:
+async def delete_course(session: AsyncSession, db_course: Course) -> None:
     """Soft delete: mark course as inactive"""
     db_course.is_active = False
     session.add(db_course)
     await session.commit()
-    return True

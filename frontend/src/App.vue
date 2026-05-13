@@ -1,16 +1,12 @@
 <template>
   <el-container style="height: 100vh;">
-    <!-- Боковое меню (скрыто на странице логина) -->
-    <el-aside width="220px" v-if="$route.name !== 'Login'">
+    <!-- Сайдбар показывается только если пользователь авторизован -->
+    <el-aside width="220px" v-if="isLoggedIn">
       <div class="logo">CRM Edu</div>
-      <el-menu router default-active="/dashboard" class="el-menu-vertical">
+      <el-menu router :default-active="$route.path" class="el-menu-vertical">
         <el-menu-item index="/dashboard">
           <el-icon><HomeFilled /></el-icon>
           <span>Главная</span>
-        </el-menu-item>
-        <el-menu-item index="/organizations">
-          <el-icon><OfficeBuilding /></el-icon>
-          <span>Организации</span>
         </el-menu-item>
         <el-menu-item index="/courses">
           <el-icon><Reading /></el-icon>
@@ -20,15 +16,13 @@
     </el-aside>
 
     <el-container>
-      <!-- Шапка -->
       <el-header style="padding: 0;">
         <div class="header-content">
-          <h2 style="margin: 0;">Администратор</h2>
-          <el-button v-if="$route.name !== 'Login'" type="danger" @click="logout">Выйти</el-button>
+          <h2 style="margin: 0;">{{ isLoggedIn ? 'Администратор' : 'Вход в систему' }}</h2>
+          <el-button v-if="isLoggedIn" type="danger" @click="logout">Выйти</el-button>
         </div>
       </el-header>
 
-      <!-- Основной контент -->
       <el-main>
         <router-view />
       </el-main>
@@ -37,11 +31,29 @@
 </template>
 
 <script setup>
-import { HomeFilled, OfficeBuilding, Reading } from '@element-plus/icons-vue'
-import router from './router'
+import { ref, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { HomeFilled, Reading } from '@element-plus/icons-vue'
+
+const route = useRoute()
+const router = useRouter()
+
+// Реактивная переменная вместо computed
+const isLoggedIn = ref(!!localStorage.getItem('access_token'))
+
+// Функция синхронизации состояния с localStorage
+const syncAuthState = () => {
+  isLoggedIn.value = !!localStorage.getItem('access_token')
+}
+
+// Следим за изменением маршрута (логин/дашборд/курсы)
+watch(() => route.path, syncAuthState)
+onMounted(syncAuthState)
 
 const logout = () => {
   localStorage.removeItem('access_token')
+  localStorage.removeItem('current_organization_id')
+  syncAuthState() // Мгновенно скрываем сайдбар
   router.push('/login')
 }
 </script>
@@ -65,5 +77,9 @@ const logout = () => {
   padding: 0 20px;
   background-color: #fff;
   border-bottom: 1px solid #dcdfe6;
+}
+.el-menu-vertical:not(.el-menu--collapse) {
+  width: 220px;
+  min-height: 400px;
 }
 </style>

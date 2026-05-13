@@ -11,6 +11,7 @@
             v-model="form.email" 
             placeholder="Email" 
             :prefix-icon="Message"
+            autocomplete="username"
           />
         </el-form-item>
         
@@ -20,6 +21,8 @@
             placeholder="Пароль" 
             type="password" 
             :prefix-icon="Lock"
+            autocomplete="current-password"
+            @keyup.enter="handleLogin"
           />
         </el-form-item>
         
@@ -34,9 +37,9 @@
 <script setup>
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import { Message, Lock } from '@element-plus/icons-vue'
+import api from '../api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -49,14 +52,19 @@ const form = reactive({
 const handleLogin = async () => {
   loading.value = true
   try {
-    // Используем прокси Vite: относительный путь /api -> http://127.0.0.1:8000/api
-    const response = await axios.post('/api/v1/auth/login', form)
+    // Используем централизованный api-клиент
+    const response = await api.post('/auth/login', form)
     
+    // Сохраняем токен
     localStorage.setItem('access_token', response.data.access_token)
+    
+    // Очищаем старый контекст организации при новом входе
+    localStorage.removeItem('current_organization_id')
+    
     ElMessage.success('Вы успешно вошли')
     router.push('/dashboard')
   } catch (error) {
-    const msg = error.response?.data?.detail || 'Ошибка соединения'
+    const msg = error.response?.data?.detail || 'Ошибка соединения с сервером'
     ElMessage.error(msg)
   } finally {
     loading.value = false

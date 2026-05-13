@@ -1,83 +1,126 @@
 <template>
   <div class="dashboard">
-    <el-row :gutter="20">
-      <el-col :span="24">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>Панель управления</span>
-              <el-tag type="success">Система активна</el-tag>
-            </div>
-          </template>
-          <p>Зарегистрировано организаций: <strong>{{ organizations.length }}</strong></p>
-        </el-card>
-      </el-col>
-    </el-row>
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>Доступные организации</span>
+          <div class="header-actions">
+            <el-tag v-if="currentOrgId" type="success" effect="dark" size="large">
+              Активная: {{ currentOrgName }}
+            </el-tag>
+            <el-button 
+              v-if="currentOrgId" 
+              type="warning" 
+              plain 
+              size="small" 
+              @click="clearSelection"
+            >
+              Сбросить выбор
+            </el-button>
+          </div>
+        </div>
+      </template>
 
-    <el-row :gutter="20" style="margin-top: 20px;">
-      <el-col :span="24">
-        <el-card>
-          <template #header>
-            <div class="card-header">
-              <span>Список организаций</span>
-              <el-button type="primary" size="small" @click="fetchOrgs">Обновить</el-button>
-            </div>
+      <el-table 
+        :data="organizations" 
+        v-loading="loading" 
+        style="width: 100%"
+        highlight-current-row
+        @current-change="handleRowSelect"
+      >
+        <el-table-column prop="name" label="Название" width="220" />
+        <el-table-column prop="slug" label="URL-идентификатор" width="180" />
+        <el-table-column prop="city" label="Город" width="120" />
+        <el-table-column prop="timezone" label="Часовой пояс" width="180" />
+        <el-table-column label="Статус" width="120">
+          <template #default="{ row }">
+            <el-tag :type="currentOrgId === row.id ? 'success' : 'info'" effect="plain">
+              {{ currentOrgId === row.id ? 'Активна' : 'Неактивна' }}
+            </el-tag>
           </template>
-          
-          <el-table :data="organizations" style="width: 100%" v-loading="loading">
-            <el-table-column prop="name" label="Название" width="180" />
-            <el-table-column prop="slug" label="Slug" width="150" />
-            <el-table-column prop="city" label="Город" width="120" />
-            <el-table-column prop="timezone" label="Часовой пояс" width="180" />
-            <el-table-column prop="created_at" label="Дата создания" />
-          </el-table>
-        </el-card>
-      </el-col>
-    </el-row>
+        </el-table-column>
+        <el-table-column label="Действия" width="140">
+          <template #default="{ row }">
+            <el-button 
+              :type="currentOrgId === row.id ? 'success' : 'primary'"
+              size="small"
+              @click="selectOrganization(row)"
+              :disabled="currentOrgId === row.id"
+            >
+              {{ currentOrgId === row.id ? 'Выбрана' : 'Работать' }}
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div v-if="!loading && organizations.length === 0" class="empty-state">
+        <el-empty description="У вас нет доступа к организациям" />
+      </div>
+    </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import api from '../api'
 
 const organizations = ref([])
 const loading = ref(false)
+const currentOrgId = ref(localStorage.getItem('current_organization_id') || null)
 
-const fetchOrgs = async () => {
+const currentOrgName = computed(() => {
+  const org = organizations.value.find(o => o.id === currentOrgId.value)
+  return org ? org.name : '—'
+})
+
+const fetchOrganizations = async () => {
   loading.value = true
   try {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      ElMessage.warning('Нет токена доступа')
-      return
-    }
-
-    const response = await axios.get('/api/v1/organizations/', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const response = await api.get('/organizations/')
     organizations.value = response.data
   } catch (error) {
-    ElMessage.error('Ошибка загрузки данных')
+    ElMessage.error('Не удалось загрузить список организаций')
     console.error(error)
   } finally {
     loading.value = false
   }
 }
 
+const selectOrganization = (org) => {
+  currentOrgId.value = org.id
+  localStorage.setItem('current_organization_id', org.id)
+  ElMessage.success(`Контекст переключён на "${org.name}"`)
+}
+
+const clearSelection = () => {
+  currentOrgId.value = null
+  localStorage.removeItem('current_organization_id')
+  ElMessage.info('Выбор организации сброшен')
+}
+
+const handleRowSelect = (row) => {
+  if (row) selectOrganization(row)
+}
+
 onMounted(() => {
-  fetchOrgs()
+  fetchOrganizations()
 })
 </script>
 
 <style scoped>
-.card-header {
+.dashboard { padding: 20px; }
+.card-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.header-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
-.dashboard {
-  padding: 10px;
-}
+.empty-state { padding: 40px 0; text-align: center; }
 </style>
